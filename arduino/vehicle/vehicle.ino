@@ -1,36 +1,21 @@
+#include <stdint.h>
+
 #include <SPI.h>
 #include <RH_RF69.h>
 
 #include "cmdproc.h"
+#include "radio.h"
 
 // Singleton instance of the radio driver
 static RH_RF69 rf69;
 
 void setup()
 {
+    // TODO get address from EEPROM
+    uint8_t address = 1;
+    radio_init(&rf69, address);
+    
     Serial.begin(9600);
-    if (!rf69.init())
-        Serial.println("init failed");
-    else
-        Serial.println("init success!");
-
-    if (!rf69.setFrequency(869.850))
-        Serial.println("setFrequency failed");
-
-    const RH_RF69::ModemConfig config = {
-        (RH_RF69_DATAMODUL_DATAMODE_PACKET |
-         RH_RF69_DATAMODUL_MODULATIONTYPE_FSK |
-         RH_RF69_DATAMODUL_MODULATIONSHAPING_FSK_BT0_5),
-        0x01, 0x00,             // bit rate
-        0x02, 0x00,             // freq dev
-        0xe1, 0xe1,
-        (RH_RF69_PACKETCONFIG1_PACKETFORMAT_VARIABLE |
-         RH_RF69_PACKETCONFIG1_DCFREE_WHITENING |
-         RH_RF69_PACKETCONFIG1_CRC_ON |
-         RH_RF69_PACKETCONFIG1_ADDRESSFILTERING_NODE_BC)
-    };
-    rf69.setModemRegisters(&config);
-    rf69.setTxPower(0);
 }
 
 static bool sendit(int len, const uint8_t * data, int retries)
