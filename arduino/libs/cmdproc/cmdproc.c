@@ -33,14 +33,14 @@ int cmd_process(const cmd_t *commands, char *line)
     int argc = split(line, argv, CMD_MAX_ARGS);
     if (argc == 0) {
         // no command present
-        return -1;
+        return CMD_NO_CMD;
     }
 
     // find matching entry
     const cmd_t *cmd = find_cmd(commands, argv[0]);
     if (cmd == NULL) {
         // no command found
-        return -2;
+        return CMD_UNKNOWN;
     }
 
     // execute
