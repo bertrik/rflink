@@ -2,6 +2,8 @@
 #include <RH_RF69.h>
 
 #include "radio.h"
+#include "cmdproc.h"
+#include "editline.h"
 
 // Singleton instance of the radio driver
 static RH_RF69 rf69;
@@ -31,9 +33,37 @@ static bool sendit(int len, const uint8_t *data, int retries)
     return false;
 }
 
+// forward declaration
+static int do_help(int argc, char *argv[]);
+
+static const cmd_t commands[] = {
+    {"help",    do_help,    "lists all commands"},
+    {"", NULL, ""}
+};
+
+static int do_help(int argc, char *argv[])
+{
+    (void) argc;
+    (void) argv;
+    for (const cmd_t * cmd = commands; cmd->cmd != NULL; cmd++) {
+        Serial.print(cmd->name);
+        Serial.print(" ");
+        Serial.println(cmd->help);
+    }
+}
 
 void loop()
 {
+    static char textbuffer[16];
+
+    // command processing
+    if (Serial.available() > 0) {
+        char c = Serial.read();
+        if (line_edit(c, textbuffer, sizeof(textbuffer))) {
+            int res = cmd_process(commands, textbuffer);
+        }
+    }
+
     if (rf69.available()) {
         uint8_t buf[64];
         uint8_t len = sizeof(buf);
