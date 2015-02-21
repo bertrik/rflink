@@ -1,21 +1,46 @@
 #include <stdint.h>
 
+#include <EEPROM.h>
 #include <SPI.h>
 #include <RH_RF69.h>
 
 #include "cmdproc.h"
 #include "radio.h"
 
+// EEPROM address of node id
+#define EE_ADDR_ID  0
+
 // Singleton instance of the radio driver
 static RH_RF69 rf69;
 
+static uint8_t id_read(void)
+{
+    return EEPROM.read(EE_ADDR_ID);
+}
+
+static void id_write(uint8_t id)
+{
+    uint8_t old = EEPROM.read(EE_ADDR_ID);
+    if (id != old) {
+        EEPROM.write(EE_ADDR_ID, id);
+    }
+}
+
 void setup()
 {
-    // TODO get address from EEPROM
-    uint8_t address = 1;
-    radio_init(&rf69, address);
-    
     Serial.begin(9600);
+    Serial.println("Vehicle");
+
+    uint8_t address = id_read();
+    Serial.print("node id = ");
+    Serial.println(address, DEC);
+    
+    Serial.print("init radio = ");
+    if (radio_init(&rf69, address)) {
+        Serial.println("OK");
+    } else {
+        Serial.println("FAIL");
+    }
 }
 
 static bool sendit(int len, const uint8_t * data, int retries)
@@ -38,8 +63,25 @@ static bool sendit(int len, const uint8_t * data, int retries)
 // forward declaration
 static int do_help(int argc, char *argv[]);
 
+static int do_id(int argc, char *argv[])
+{
+    char id;
+    if (argc > 1) {
+        // set the id
+        id = atoi(argv[1]);
+        id_write(id);
+    }
+    // show the id
+    id = id_read();
+    Serial.print("id=");
+    Serial.println(id, DEC);
+}
+
+
 static const cmd_t commands[] = {
-    {"help", do_help, "lists all commands"}
+    {"id",      do_id,      "[id] show or set the node id"},
+    {"help",    do_help,    "lists all commands"},
+    {"", NULL, ""}
 };
 
 static int do_help(int argc, char *argv[])
