@@ -5,6 +5,7 @@
 #include <RH_RF69.h>
 
 #include "cmdproc.h"
+#include "editline.h"
 #include "radio.h"
 
 // EEPROM address of node id
@@ -41,23 +42,8 @@ void setup()
     } else {
         Serial.println("FAIL");
     }
-}
-
-static bool sendit(int len, const uint8_t * data, int retries)
-{
-    int i;
-    for (i = 0; i < retries; i++) {
-        int rssi = rf69.rssiRead();
-        if (rssi < -80) {
-            // channel clear, send it
-            rf69.send(data, len);
-            rf69.waitPacketSent();
-            rf69.setModeRx();
-            return true;
-        }
-        delay(2);
-    }
-    return false;
+    
+    randomSeed(address);
 }
 
 // forward declaration
@@ -95,21 +81,45 @@ static int do_help(int argc, char *argv[])
     }
 }
 
+static int fake_telemetry(long int t, uint8_t *buffer)
+{
+    int x = (int)(2000.0 * cos(t / 20000.0));
+    int y = (int)(1000.0 * sin(t / 10000.0));
+
+    buffer[0] = 0;
+    buffer[1] = (x >> 8) & 0xFF;
+    buffer[2] = (x >> 0) & 0xFF;
+    buffer[3] = (y >> 8) & 0xFF;
+    buffer[4] = (y >> 0) & 0xFF;
+}
+
 
 void loop()
 {
     static long int last_sent = 0;
+    uint8_t telemetry[5];
 
     long int m = millis();
-    if ((m - last_sent) > 100) {
-        last_sent += 100;
 
-        // send with listen-before-talk
-        char data[32];
-        memset(data, 0, sizeof(data));
-        strcpy(data, "THIS IS A BEACON");
-        if (!sendit(sizeof(data), (uint8_t *) data, 3)) {
-            last_sent += 3;
+    // command processing
+    static char textbuffer[16];
+    if (Serial.available() > 0) {
+        char c = Serial.read();
+        if (line_edit(c, textbuffer, sizeof(textbuffer))) {
+            int res = cmd_process(commands, textbuffer);
         }
+    }
+    
+    // fake telemetry
+    fake_telemetry(m, telemetry);
+    
+    // telemetry broadcast
+    if ((m - last_sent) > 100) {
+        // send it        
+        if (!radio_broadcast(sizeof(telemetry), telemetry)) {
+            // shift transmit schedule a bit
+            last_sent += random(5);
+        }
+        last_sent += 100;
     }
 }
