@@ -37,6 +37,37 @@ bool radio_init(RH_RF69 *rf, uint8_t address)
     rf69->setHeaderFrom(address);
     rf69->setModeRx();
     
+    rf69->spiWrite(0x39, address);
+    rf69->spiWrite(0x3A, 0xFF);
+    
     return true;
 }
+
+// returns true if the radio channel is free
+bool radio_clear(void)
+{
+    int rssi = rf69->rssiRead();
+    return (rssi < -80);
+}
+
+// broadcasts a message if the channel is free
+// returns true if the message was sent, false otherwise
+bool radio_broadcast(int len, const uint8_t *data)
+{
+    if (!radio_clear()) {
+        return false;
+    }
+
+    rf69->setHeaderTo(0xFF);
+    rf69->setHeaderId(0);
+    
+    rf69->send(data, len);
+    rf69->waitPacketSent();
+    
+    // back to rx mode
+    rf69->setModeRx();
+    return true;
+}
+
+
 
