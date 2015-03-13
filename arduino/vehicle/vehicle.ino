@@ -13,6 +13,7 @@
 
 // Singleton instance of the radio driver
 static RH_RF69 rf69;
+static uint8_t node_id;
 
 static uint8_t id_read(void)
 {
@@ -32,18 +33,18 @@ void setup()
     Serial.begin(9600);
     Serial.println("Vehicle");
 
-    uint8_t address = id_read();
+    node_id = id_read();
     Serial.print("node id = ");
-    Serial.println(address, DEC);
+    Serial.println(node_id, DEC);
     
     Serial.print("init radio = ");
-    if (radio_init(&rf69, address)) {
+    if (radio_init(&rf69, node_id)) {
         Serial.println("OK");
     } else {
         Serial.println("FAIL");
     }
     
-    randomSeed(address);
+    randomSeed(node_id);
 }
 
 // forward declaration
@@ -96,7 +97,7 @@ static int fake_telemetry(long int t, uint8_t *buffer)
 
 void loop()
 {
-    static long int last_sent = 0;
+    static long int txtime = 0;
     uint8_t telemetry[5];
 
     long int m = millis();
@@ -113,13 +114,22 @@ void loop()
     // fake telemetry
     fake_telemetry(m, telemetry);
     
-    // telemetry broadcast
-    if ((m - last_sent) > 100) {
-        // send it        
-        if (!radio_broadcast(sizeof(telemetry), telemetry)) {
-            // shift transmit schedule a bit
-            last_sent += random(5);
+    // receive start of frame
+    if (rf69.available()) {
+        uint8_t buf[64];
+        uint8_t len;
+        rf69.recv(buf, &len);
+        if (buf[0] == 0x01) {
+            // beacon, calculate tx time
+            txtime = (m - 5) + (10 * node_id);
         }
-        last_sent += 100;
+    }
+    
+    // telemetry broadcast
+    if ((m > txtime) && (m < txtime + 10)) {
+        // send it        
+        radio_broadcast(sizeof(telemetry), telemetry);
+        txtime = 0;
     }
 }
+

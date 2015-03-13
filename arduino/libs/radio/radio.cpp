@@ -54,10 +54,6 @@ bool radio_clear(void)
 // returns true if the message was sent, false otherwise
 bool radio_broadcast(int len, const uint8_t *data)
 {
-    if (!radio_clear()) {
-        return false;
-    }
-
     rf69->setHeaderTo(0xFF);
     rf69->setHeaderId(0);
     

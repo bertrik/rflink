@@ -18,6 +18,7 @@ typedef struct {
     long int time;
     int x;
     int y;
+    int rssi;
 } telem_t;
 
 #define TELEM_SIZE  3
@@ -85,7 +86,7 @@ static void telemetry_expire(long int t)
     }
 }
 
-static void telemetry_update(long int t, uint8_t addr, const uint8_t *buf)
+static void telemetry_update(long int t, uint8_t addr, const uint8_t *buf, int rssi)
 {
     int x = buf[1] * 256 + buf[2];
     int y = buf[3] * 256 + buf[4];
@@ -98,17 +99,18 @@ static void telemetry_update(long int t, uint8_t addr, const uint8_t *buf)
         telemetry[slot].time = t;
         telemetry[slot].x = x;
         telemetry[slot].y = y;
+        telemetry[slot].rssi = rssi;
     }
 }
 
 static void telemetry_show(void)
 {
     char buf[32];
-    Serial.println("Id     X     Y time");
+    Serial.println("Id     X     Y RSSI time");
     for (int i = 0; i < TELEM_SIZE; i++) {
         telem_t *t = &telemetry[i];
         if (t->valid) {
-            sprintf(buf, "%2d %5d %5d %ld", t->addr, t->x, t->y, t->time);
+            sprintf(buf, "%2d %5d %5d %4d %ld", t->addr, t->x, t->y, t->rssi, t->time);
             Serial.println(buf);
         }
     }
@@ -118,6 +120,7 @@ void loop()
 {
     static char textbuffer[16];
     static long int last_sent = 0;
+    static long int last_show = 0;
     
     long int t = millis();
 
@@ -128,6 +131,15 @@ void loop()
             int res = cmd_process(commands, textbuffer);
         }
     }
+    
+    // send beacon
+    if (t > last_sent) {
+        last_sent += 100;
+        uint8_t buf[1];
+        buf[0] = 0x01;
+        radio_broadcast(sizeof(buf), buf);
+Serial.print("#");
+    }
 
     // telemetry reception
     if (rf69.available()) {
@@ -137,15 +149,17 @@ void loop()
             if ((len > 0) && buf[0] == 0) {
                 // got telemetry data
                 uint8_t from = rf69.headerFrom();
-                telemetry_update(t, from, buf);
+                telemetry_update(t, from, buf, rf69.lastRssi());
             }
         }
+Serial.print("!");
     }
 
     // telemetry display
-    if ((t - last_sent) > 1000) {
+    if ((t - last_show) > 1000) {
+        Serial.println();
         telemetry_show();
         telemetry_expire(t);
-        last_sent = t;
+        last_show = t;
     }
 }
