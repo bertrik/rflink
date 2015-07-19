@@ -10,7 +10,6 @@ void radio_read_fifo(uint8_t *data, int len);
 
 bool radio_init(uint8_t node_id);
 
-bool radio_rf_init(void);
 void radio_send_packet(uint8_t len, uint8_t *data);
 
 bool radio_packet_avail(void);

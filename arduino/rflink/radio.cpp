@@ -7,23 +7,6 @@
 #define RADIO_FREQUENCY 869.85
 #define RADIO_POWER     0
 
-static uint8_t node_id;
-
-bool radio_init(uint8_t address)
-{
-    node_id = address;
-
-    // TODO BSI move this to HAL
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setBitOrder(MSBFIRST);
-    SPI.setClockDivider(SPI_CLOCK_DIV8);
-    SPI.begin();
-
-    pinMode(10, OUTPUT);
-
-    return true;
-}
-
 static void spi_select()
 {
     digitalWrite(10, 0);
@@ -88,23 +71,26 @@ void radio_mode_recv(void)
     radio_write_reg(RFM69_OPMODE,
                     RFM69_MODE_SEQUENCER_ON | RFM69_MODE_RECEIVER);
 
+#if 0
     // configure automode to go to standby on reception to read the packet
     radio_write_reg(RFM69_AUTO_MODES,
                     RFM69_AUTOMODE_ENTER_RISING_PAYLOADREADY |
                     RFM69_AUTOMODE_INTERMEDIATEMODE_STANDBY |
                     RFM69_AUTOMODE_EXIT_FALLING_FIFONOTEMPTY);
+#else
+    radio_write_reg(RFM69_AUTO_MODES, 0);
+#endif
 }
 
 bool radio_packet_avail(void)
 {
-#if 0
+#if 1
     uint8_t irq2 = radio_read_reg(RFM69_IRQ_FLAGS2);
     // check PayloadReady
     return (irq2 & (1 << 2)) != 0;
 #else
     // check AutoMode
     uint8_t irq1 = radio_read_reg(RFM69_IRQ_FLAGS1);
-    // check PayloadReady
     return (irq1 & (1 << 1)) != 0;
 #endif
 }
@@ -145,23 +131,14 @@ void radio_send_packet(uint8_t len, uint8_t * data)
     radio_write_reg(RFM69_FIFO, len);
     radio_write_fifo(data, len);
 
-    // wait until automode entered
-    Serial.print("tx");
     uint8_t irq1;
-    do {
-        irq1 = radio_read_reg(RFM69_IRQ_FLAGS1);
-    } while ((irq1 & (1 << 1)) == 0);
-
     // wait until automode exited
-    Serial.print("..");
     do {
         irq1 = radio_read_reg(RFM69_IRQ_FLAGS1);
     } while ((irq1 & (1 << 1)) != 0);
-
-    Serial.println("done");
 }
 
-bool radio_rf_init(void)
+bool radio_init(uint8_t node_id)
 {
     // check version register
     uint8_t version = radio_read_reg(RFM69_VERSION);
@@ -169,7 +146,9 @@ bool radio_rf_init(void)
         return false;
     }
     // packet mode, FSK, BT=0.5
-    radio_write_reg(RFM69_DATA_MODUL, 0x02);
+    radio_write_reg(RFM69_DATA_MODUL, (0 << 5) |        // packet mode
+                    (0 << 3) |  // FSK
+                    (2 << 0));  // Gaussian filter, BT=0.5
 
     //  bitrate
     radio_write_reg(RFM69_BITRATE_MSB, 0x01);
@@ -179,9 +158,13 @@ bool radio_rf_init(void)
     radio_write_reg(RFM69_FDEV_MSB, 0x02);
     radio_write_reg(RFM69_FDEV_LSB, 0x00);
 
-    // bandwidth
-    radio_write_reg(RFM69_RX_BW, 0xE1);
-    radio_write_reg(RFM69_AFC_BW, 0xE1);
+    // bandwidth: setup for 250 kHz
+    radio_write_reg(RFM69_RX_BW, (2 << 5) |     // DccFreq
+                    (2 << 3) |  // 0:RxBwMant=16
+                    (1 << 0));  // RxBwExp
+    radio_write_reg(RFM69_AFC_BW, (2 << 5) |    // DccFreq
+                    (2 << 3) |  // 0:RxBwMant=16
+                    (1 << 0));  // RxBwExp
 
     // fading margin improvement, see datasheet
     radio_write_reg(RFM69_TEST_DAGC, 0x20);
@@ -218,10 +201,12 @@ bool radio_rf_init(void)
     // LNA
     radio_write_reg(RFM69_LNA, (1 << 8));       // 200 ohm impedance, automatic gain
 
-    // frequency = 869.85
-    radio_write_reg(RFM69_FRF_MSB, 0xD9);
-    radio_write_reg(RFM69_FRF_MID, 0x76);
-    radio_write_reg(RFM69_FRF_LSB, 0x66);
+    // frequency = 869850 kHz
+    uint32_t f = 869850;
+    uint32_t n = f * 2048 / 125;
+    radio_write_reg(RFM69_FRF_MSB, (n >> 16) & 0xFF);
+    radio_write_reg(RFM69_FRF_MID, (n >> 8) & 0xFF);
+    radio_write_reg(RFM69_FRF_LSB, n & 0xFF);
 
     return true;
 }

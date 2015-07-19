@@ -27,19 +27,30 @@ static void id_write(uint8_t id)
 
 
 static uint8_t node_id;
+static uint8_t pkt[64];
+static uint8_t have_data = 0;
 
 void setup()
 {
-    Serial.begin(115200);
+    Serial.begin(57600);
     Serial.println("RFLINK");
 
+    // read node id from eeprom
     node_id = id_read();
     Serial.print("node id = ");
     Serial.println(node_id, DEC);
 
+    // SPI init
+    // TODO BSI move this to HAL
+    SPI.setDataMode(SPI_MODE0);
+    SPI.setBitOrder(MSBFIRST);
+    SPI.setClockDivider(SPI_CLOCK_DIV8);
+    SPI.begin();
+    pinMode(10, OUTPUT);
+
     radio_init(node_id);
-    Serial.print("init radio = ");
-    if (radio_rf_init()) {
+    Serial.print("radio_init = ");
+    if (radio_init(node_id)) {
         Serial.println("OK");
     } else {
         Serial.println("FAIL");
@@ -51,10 +62,50 @@ void setup()
 // forward declaration
 static int do_help(int argc, char *argv[]);
 
+static int do_id(int argc, char *argv[])
+{
+    uint8_t node_id = id_read();
+    if (argc >= 2) {
+        node_id = atoi(argv[1]);
+        Serial.print("Setting id to ");
+        Serial.print(node_id);
+        id_write(node_id);
+        radio_init(node_id);
+        radio_mode_recv();
+   }
+   Serial.print("id = ");
+   Serial.println(node_id);
+}
+
+static int do_ping(int argc, char *argv[])
+{
+    uint8_t node = 0xFF;
+    if (argc >= 2) {
+        node = atoi(argv[1]);
+    }
+    Serial.print("Sending ping to ");
+    Serial.println(node, HEX);
+    
+    int idx = 0;
+    pkt[idx++] = node;
+    pkt[idx++] = node_id;
+    pkt[idx++] = 0x01;
+    have_data = idx;
+}
+
 static const cmd_t commands[] = {
     {"help",    do_help,    "lists all commands"},
+    {"id",      do_id,      "[id] gets/sets the node id"},
+    {"ping",    do_ping,    "[node] sends a ping to node"},
     {"", NULL, ""}
 };
+
+typedef struct {
+    uint32_t time;
+    uint8_t frame;
+    uint8_t slot_offs;
+    uint8_t slot_size;
+} beacon_t;
 
 static int do_help(int argc, char *argv[])
 {
@@ -67,15 +118,14 @@ static int do_help(int argc, char *argv[])
     }
 }
 
-
-static char hello[] = "\xFFHello Dear World, How Are You Today?";
+static beacon_t beacon;
 
 void loop()
 {
     static char textbuffer[16];
     static int prev_sec = 0;
-
-    long int t = millis();
+    static int count = 0;
+    static unsigned long int next_send;
 
     // command processing
     if (Serial.available() > 0) {
@@ -86,34 +136,78 @@ void loop()
     }
 
     // radio processing
-#if 0
-    int sec = millis() / 1000;
-    if (sec != prev_sec) {
-        radio_send_packet(sizeof(hello), (uint8_t *)hello);
-        radio_mode_recv();
-        prev_sec = sec;
+    unsigned long int m = millis();
+
+    // do beacon processing if we are master
+    if (node_id == 0) {
+        int sec = m / 100;
+        if (sec != prev_sec) {
+            prev_sec = sec;
+            // update beacon
+            beacon.time = m;
+            beacon.frame++;
+            beacon.slot_offs = 10;
+            beacon.slot_size = 10;
+            // create packet
+            uint8_t buf[16];
+            int idx = 0;
+            buf[idx++] = 0xFF;      // to: broadcast
+            buf[idx++] = node_id;   // from: us
+            buf[idx++] = 0x00;      // command?
+            memcpy(&buf[idx], &beacon, sizeof(beacon));
+            idx += sizeof(beacon);
+            // send it
+            radio_send_packet(idx, buf);
+            radio_mode_recv();
+            // configure our own send slot
+            next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
+        }
     }
-#else
+
+    // our send slot arrived and we have something to send?
+    if ((m >= next_send) && (m < (next_send + 10))) {
+        if (have_data > 0) {
+            radio_send_packet(have_data, pkt);
+            radio_mode_recv();
+            have_data = 0;
+        }
+    }
+    
+    // handle received packets
     if (radio_packet_avail()) {
-        Serial.println("Got packet:");
         uint8_t len;
         uint8_t buf[64];
         radio_recv_packet(&len, buf, sizeof(buf));
-        for (int i = 0; i < len; i++) {
-           uint8_t b =  buf[i];
-           Serial.print((b >> 4) & 0xF, HEX);
-           Serial.print((b >> 0) & 0xF, HEX);
+        if (buf[2] == 0x00) {
+            // beacon
+            memcpy(&beacon, &buf[3], sizeof(beacon));
+//            Serial.print("beacon: time=");
+//            Serial.print(beacon.time);
+//            Serial.print(",frame=");
+//            Serial.println(beacon.frame);
+            // determine next send time
+            next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
+        } else if (buf[2] == 0x01) {
+            // ping received
+            uint8_t node = buf[1];
+            Serial.print("Got ping from ");
+            Serial.print(node);
+            Serial.println(", sending pong...");
+            // prepare pong
+            int idx = 0;
+            pkt[idx++] = node;
+            pkt[idx++] = node_id;
+            pkt[idx++] = 0x02;      // pong
+            have_data = idx;
+        } else {
+            Serial.print("Got:");
+            for (int i = 0; i < len; i++) {
+                uint8_t b = buf[i];
+                Serial.print((b >> 4) & 0xF);
+                Serial.print((b >> 0) & 0xF);
+            }
+            Serial.println(".");
         }
-        Serial.println(".");
     }
-#endif
-
-#if 0
-    uint8_t irq1 = radio_read_reg(RFM69_IRQ_FLAGS1);
-    uint8_t irq2 = radio_read_reg(RFM69_IRQ_FLAGS2);
-    Serial.print(irq1, HEX);
-    Serial.print(" ");
-    Serial.println(irq2, HEX);
-#endif
 
 }
