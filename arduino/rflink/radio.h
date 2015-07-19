@@ -13,4 +13,10 @@ bool radio_init(uint8_t node_id);
 bool radio_rf_init(void);
 void radio_send_packet(uint8_t len, uint8_t *data);
 
+bool radio_packet_avail(void);
+bool radio_recv_packet(uint8_t *len_p, uint8_t *data, int size);
+void radio_mode_recv(void);
+
+
+
 #endif /* RADIO_H */

@@ -3,7 +3,7 @@
 #include "cmdproc.h"
 
 
-static const cmd_t *find_cmd(const cmd_t *commands, const char *name)
+static const cmd_t *find_cmd(const cmd_t * commands, const char *name)
 {
     const cmd_t *cmd;
     for (cmd = commands; cmd->cmd != NULL; cmd++) {
@@ -25,7 +25,7 @@ static int split(char *input, char *args[], int maxargs)
     return argc;
 }
 
-int cmd_process(const cmd_t *commands, char *line)
+int cmd_process(const cmd_t * commands, char *line)
 {
     char *argv[CMD_MAX_ARGS];
 
@@ -35,17 +35,13 @@ int cmd_process(const cmd_t *commands, char *line)
         // no command present
         return CMD_NO_CMD;
     }
-
     // find matching entry
     const cmd_t *cmd = find_cmd(commands, argv[0]);
     if (cmd == NULL) {
         // no command found
         return CMD_UNKNOWN;
     }
-
     // execute
     int res = cmd->cmd(argc, argv);
     return res;
 }
-
-

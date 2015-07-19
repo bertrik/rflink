@@ -1,30 +1,31 @@
+#include "Arduino.h"
+
 #include "hal.h"
-#include "arduino.h"
 
 // serial functions
 void serial_init(void)
 {
-  // nothing to do yet
+    // nothing to do yet
 }
 
 void serial_setup(int speed, int flags)
 {
-  Serial.begin(speed);
+    Serial.begin(speed);
 }
 
 void serial_write(char c)
 {
-  Serial.write(c);
+    Serial.write(c);
 }
 
 int serial_read(void)
 {
-  return Serial.read();
+    return Serial.read();
 }
 
 bool serial_avail(void)
 {
-  return (Serial.available() > 0);
+    return (Serial.available() > 0);
 }
 
 // time functions
