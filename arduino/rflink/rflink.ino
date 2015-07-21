@@ -55,8 +55,6 @@ void setup()
     } else {
         Serial.println("FAIL");
     }
-    
-    radio_mode_recv();
 }
 
 // forward declaration
@@ -71,7 +69,6 @@ static int do_id(int argc, char *argv[])
         Serial.print(node_id);
         id_write(node_id);
         radio_init(node_id);
-        radio_mode_recv();
    }
    Serial.print("id = ");
    Serial.println(node_id);
@@ -158,7 +155,6 @@ void loop()
             idx += sizeof(beacon);
             // send it
             radio_send_packet(idx, buf);
-            radio_mode_recv();
             // configure our own send slot
             next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
         }
@@ -168,7 +164,6 @@ void loop()
     if ((m >= next_send) && (m < (next_send + 10))) {
         if (have_data > 0) {
             radio_send_packet(have_data, pkt);
-            radio_mode_recv();
             have_data = 0;
         }
     }
