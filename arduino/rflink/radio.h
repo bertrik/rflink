@@ -1,7 +1,8 @@
 #ifndef RADIO_H
 #define RADIO_H
 
-#include "bareRFM69_const.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 void radio_write_reg(uint8_t reg, uint8_t data);
 uint8_t radio_read_reg(uint8_t reg);
