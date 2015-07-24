@@ -28,6 +28,7 @@ static void id_write(uint8_t id)
 
 
 static uint8_t node_id;
+static int32_t time_offset = 0;
 
 typedef struct {
     uint8_t len;
@@ -179,7 +180,7 @@ static int do_recv(int argc, char *argv[])
     uint8_t type = buf->data[2];
 
     Serial.print(argv[0]);
-    Serial.print(" ");
+    Serial.print(" 00 ");
     Serial.print(dest, HEX);
     Serial.print(" ");
     Serial.print(type, HEX);
@@ -190,12 +191,26 @@ static int do_recv(int argc, char *argv[])
     return 0;
 }
 
+static int do_time(int argc, char *argv[])
+{
+    uint32_t time = millis() + time_offset;
+    if (argc == 2) {
+        time = atoi(argv[1]);
+        // recalculate time offset
+        time_offset = time - millis();
+    }
+    Serial.print(argv[0]);
+    Serial.print(" 00 ");
+    Serial.println(time);
+}
+
 static const cmd_t commands[] = {
     {"help",    do_help,    "lists all commands"},
     {"id",      do_id,      "[id] gets/sets the node id"},
     {"ping",    do_ping,    "[node] sends a ping to node"},
     {"s",       do_send,    "[node] [type] [data] sends data"},
     {"r",       do_recv,    "[node] returns data from buffer"},
+    {"time",    do_time,    "[time] gets/set the time"},
     {"", NULL, ""}
 };
 
@@ -243,7 +258,7 @@ void loop()
         if (sec != prev_sec) {
             prev_sec = sec;
             // update beacon
-            beacon.time = m;
+            beacon.time = m + time_offset;
             beacon.frame++;
             beacon.slot_offs = 10;
             beacon.slot_size = 10;
@@ -285,6 +300,8 @@ void loop()
             memcpy(&beacon, &rcv[3], sizeof(beacon));
             // determine next send time
             next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
+            // recalculate time offset
+            time_offset = beacon.time - m;
             break;
 
         case 0x01:
