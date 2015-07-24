@@ -1,4 +1,4 @@
-#include "SPI.h"
+#include "hal.h"
 
 #include "RFM69_const.h"
 #include "radio.h"
@@ -8,38 +8,26 @@
 #define RADIO_FREQUENCY_KHZ 869850
 #define RADIO_POWER     0
 
-static void spi_select()
-{
-    digitalWrite(10, 0);
-}
-
-
-static void spi_deselect()
-{
-    digitalWrite(10, 1);
-}
-
-
+// write data to a radio register
 static void radio_write(uint8_t reg, uint8_t * data, int len)
 {
-    spi_select();
-    SPI.transfer(reg);
-    int i;
-    for (i = 0; i < len; i++) {
-        SPI.transfer(data[i]);
+    spi_select(true);
+    spi_transfer(reg);
+    for (int i = 0; i < len; i++) {
+        spi_transfer(data[i]);
     }
-    spi_deselect();
+    spi_select(false);
 }
 
+// read data from a radio register
 static void radio_read(uint8_t reg, uint8_t * data, int len)
 {
-    spi_select();
-    SPI.transfer(reg);
-    int i;
-    for (i = 0; i < len; i++) {
-        data[i] = SPI.transfer(0);
+    spi_select(true);
+    spi_transfer(reg);
+    for (int i = 0; i < len; i++) {
+        data[i] = spi_transfer(0);
     }
-    spi_deselect();
+    spi_select(false);
 }
 
 void radio_write_reg(uint8_t reg, uint8_t data)
@@ -109,7 +97,7 @@ void radio_send_packet(uint8_t len, uint8_t * data)
     do {
         irq1 = radio_read_reg(RFM69_IRQ_FLAGS1);
     } while ((irq1 & (1 << 1)) != 0);
-    
+
     // back to receiver mode
     radio_mode_recv();
 }
@@ -191,7 +179,7 @@ bool radio_init(uint8_t node_id)
     radio_write_reg(RFM69_FRF_MSB, (n >> 16) & 0xFF);
     radio_write_reg(RFM69_FRF_MID, (n >> 8) & 0xFF);
     radio_write_reg(RFM69_FRF_LSB, n & 0xFF);
-    
+
     // into receiver mode
     radio_mode_recv();
 

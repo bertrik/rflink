@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "SPI.h"
 
 #include "hal.h"
 
@@ -27,6 +28,34 @@ bool serial_avail(void)
 {
     return (Serial.available() > 0);
 }
+
+// SPI functions
+#define SPI_SELECT_PIN  10
+
+void spi_init(uint32_t speed, int flags)
+{
+    (void)speed;    // ignored for now
+    (void)flags;    // ignored for now
+
+    pinMode(SPI_SELECT_PIN, OUTPUT);
+    spi_select(false);
+
+    SPI.setDataMode(SPI_MODE0);
+    SPI.setBitOrder(MSBFIRST);
+    SPI.setClockDivider(SPI_CLOCK_DIV8);
+    SPI.begin();
+}
+
+void spi_select(bool enable)
+{
+    digitalWrite(SPI_SELECT_PIN, enable ? 0 : 1);
+}
+
+uint8_t spi_transfer(uint8_t in)
+{
+    return SPI.transfer(in);
+}
+
 
 // time functions
 int32_t time_getms(void);

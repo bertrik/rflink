@@ -9,10 +9,9 @@
 #include <stdbool.h>
 
 // SPI functions
-void spi_init(void);
-void spi_setup(int speed, int flags);
-int spi_send(int num, char *buf);
-int spi_recv(int num, char *buf);
+void spi_init(uint32_t speed, int flags);
+void spi_select(bool enable);
+uint8_t spi_transfer(uint8_t in);
 
 // serial functions
 void serial_init(void);

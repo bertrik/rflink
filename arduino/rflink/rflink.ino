@@ -5,6 +5,7 @@
 #include "radio.h"
 #include "cmdproc.h"
 #include "editline.h"
+#include "hal.h"
 
 #include "SPI.h"
 #include "EEPROM.h"
@@ -41,6 +42,7 @@ void setup()
     Serial.println(node_id, DEC);
 
     // SPI init
+    spi_init(1000000L, 0);
     // TODO BSI move this to HAL
     SPI.setDataMode(SPI_MODE0);
     SPI.setBitOrder(MSBFIRST);
@@ -82,7 +84,7 @@ static int do_ping(int argc, char *argv[])
     }
     Serial.print("Sending ping to ");
     Serial.println(node, HEX);
-    
+
     int idx = 0;
     pkt[idx++] = node;
     pkt[idx++] = node_id;
@@ -167,7 +169,7 @@ void loop()
             have_data = 0;
         }
     }
-    
+
     // handle received packets
     if (radio_packet_avail()) {
         uint8_t len;
