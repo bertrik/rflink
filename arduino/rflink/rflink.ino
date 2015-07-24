@@ -13,6 +13,16 @@
 // EEPROM address of node id
 #define EE_ADDR_ID  0
 
+static void print(char *fmt, ...)
+{
+    char buf[128]; // resulting string limited to 128 chars
+    va_list args;
+    va_start (args, fmt);
+    vsnprintf(buf, 128, fmt, args);
+    va_end (args);
+    Serial.print(buf);
+}
+
 static uint8_t id_read(void)
 {
     return EEPROM.read(EE_ADDR_ID);
@@ -59,19 +69,13 @@ void setup()
 
     // read node id from eeprom
     node_id = id_read();
-    Serial.print("node id = ");
-    Serial.println(node_id, DEC);
+    print("node id = %02X\n", node_id);
 
     // SPI init
     spi_init(1000000L, 0);
 
-    radio_init(node_id);
-    Serial.print("radio_init = ");
-    if (radio_init(node_id)) {
-        Serial.println("OK");
-    } else {
-        Serial.println("FAIL");
-    }
+    bool ok = radio_init(node_id);
+    print("radio_init = %s\n", ok ? "OK" : "FAIL");
 }
 
 // forward declaration
@@ -85,8 +89,7 @@ static int do_id(int argc, char *argv[])
         id_write(node_id);
         radio_init(node_id);
     }
-    Serial.print("id 00 ");
-    Serial.println(node_id);
+    print("%s 00 %02X\n", argv[0], node_id);
     return 0;
 }
 
@@ -100,9 +103,7 @@ static int do_ping(int argc, char *argv[])
     // prepare ping message
     fill_buffer(node, 0x01, 0, NULL);
 
-    Serial.print(argv[0]);
-    Serial.print(" 00 ");
-    Serial.println(node, HEX);
+    print("%s 00 %02X\n", argv[0], node);
     return 0;
 }
 
@@ -149,17 +150,14 @@ static int do_send(int argc, char *argv[])
 
     fill_buffer(node, type, len, buf);
 
-    Serial.print(argv[0]);
-    Serial.println(" 00");
+    print("%s 00\n", argv[0]);
     return 0;
 }
 
 static void printhex(uint8_t *rcv, int len)
 {
     for (int i = 0; i < len; i++) {
-        uint8_t b = rcv[i];
-        Serial.print((b >> 4) & 0xF, HEX);
-        Serial.print((b >> 0) & 0xF, HEX);
+        print("%02X", rcv[i]);
     }
 }
 
@@ -179,14 +177,9 @@ static int do_recv(int argc, char *argv[])
     uint8_t dest = buf->data[0];
     uint8_t type = buf->data[2];
 
-    Serial.print(argv[0]);
-    Serial.print(" 00 ");
-    Serial.print(dest, HEX);
-    Serial.print(" ");
-    Serial.print(type, HEX);
-    Serial.print(" ");
-    printhex(buf->data, buf->len);
-    Serial.println("");
+    print("%s 00 %02X %02X ", argv[0], dest, type);
+    printhex(&buf->data[3], buf->len - 3);
+    print("\n");
 
     return 0;
 }
@@ -199,9 +192,8 @@ static int do_time(int argc, char *argv[])
         // recalculate time offset
         time_offset = time - millis();
     }
-    Serial.print(argv[0]);
-    Serial.print(" 00 ");
-    Serial.println(time);
+    print("%s 00 %l\n", argv[0], time);
+    return 0;
 }
 
 static const cmd_t commands[] = {
@@ -226,9 +218,7 @@ static int do_help(int argc, char *argv[])
     (void) argc;
     (void) argv;
     for (const cmd_t * cmd = commands; cmd->cmd != NULL; cmd++) {
-        Serial.print(cmd->name);
-        Serial.print(" ");
-        Serial.println(cmd->help);
+        print("%s %s\n", cmd->name, cmd->help);
     }
 }
 
@@ -306,16 +296,14 @@ void loop()
 
         case 0x01:
             // ping received
-            Serial.print("!ping ");
-            Serial.println(node, HEX);
+            print("!ping %02X\n", node);
             // prepare pong message
             fill_buffer(node, 0x02, 0, NULL);
             break;
 
         case 0x02:
             // pong received
-            Serial.print("!pong ");
-            Serial.println(node, HEX);
+            print("!pong %02X\n", node);
             break;
 
         default:
@@ -324,12 +312,7 @@ void loop()
             memcpy(&buf->data, rcv, len);
             buf->len = len;
 
-            Serial.print("!r ");
-            Serial.println(node, HEX);
-
-            Serial.print("Got:");
-            printhex(rcv, len);
-            Serial.println(".");
+            print("!r %02X\n", node);
             break;
         }
     }
