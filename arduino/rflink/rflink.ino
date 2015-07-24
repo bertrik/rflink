@@ -293,6 +293,8 @@ void loop()
         buffer_t *buf = &buffers[node_id];
         if (buf->len > 0) {
             radio_send_packet(buf->len, buf->data);
+            uint8_t node = buf->data[0];
+            print("!s 00 %02X\n", node);
             buf->len = 0;
         }
     }
