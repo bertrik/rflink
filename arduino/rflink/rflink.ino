@@ -236,7 +236,7 @@ static beacon_t beacon;
 
 void loop()
 {
-    static char textbuffer[16];
+    static char textbuffer[150];
     static int prev_sec = 0;
     static int count = 0;
     static unsigned long int next_send;
