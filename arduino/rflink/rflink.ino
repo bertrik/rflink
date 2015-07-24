@@ -28,8 +28,28 @@ static void id_write(uint8_t id)
 
 
 static uint8_t node_id;
-static uint8_t pkt[64];
-static uint8_t have_data = 0;
+
+typedef struct {
+    uint8_t len;
+    uint8_t data[64];
+} buffer_t;
+
+static buffer_t buffers[9];
+
+static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
+{
+    // select our own node buffer as send buffer
+    buffer_t *buf = &buffers[node_id];
+
+    // fill it
+    buf->len = 3 + len;
+    buf->data[0] = to;
+    buf->data[1] = node_id;
+    buf->data[2] = flags;
+    if (len > 0) {
+        memcpy(&buf->data[3], data, len);
+    }
+}
 
 void setup()
 {
@@ -43,12 +63,6 @@ void setup()
 
     // SPI init
     spi_init(1000000L, 0);
-    // TODO BSI move this to HAL
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setBitOrder(MSBFIRST);
-    SPI.setClockDivider(SPI_CLOCK_DIV8);
-    SPI.begin();
-    pinMode(10, OUTPUT);
 
     radio_init(node_id);
     Serial.print("radio_init = ");
@@ -69,10 +83,10 @@ static int do_id(int argc, char *argv[])
         node_id = atoi(argv[1]);
         id_write(node_id);
         radio_init(node_id);
-   }
-   Serial.print("id 00 ");
-   Serial.println(node_id);
-   return 0;
+    }
+    Serial.print("id 00 ");
+    Serial.println(node_id);
+    return 0;
 }
 
 static int do_ping(int argc, char *argv[])
@@ -81,14 +95,14 @@ static int do_ping(int argc, char *argv[])
     if (argc >= 2) {
         node = atoi(argv[1]);
     }
-    Serial.print("Sending ping to ");
-    Serial.println(node, HEX);
 
-    int idx = 0;
-    pkt[idx++] = node;
-    pkt[idx++] = node_id;
-    pkt[idx++] = 0x01;
-    have_data = idx;
+    // prepare ping message
+    fill_buffer(node, 0x01, 0, NULL);
+
+    Serial.print(argv[0]);
+    Serial.print(" 00 ");
+    Serial.println(node, HEX);
+    return 0;
 }
 
 static const cmd_t commands[] = {
@@ -162,47 +176,62 @@ void loop()
     }
 
     // our send slot arrived and we have something to send?
-    if ((m >= next_send) && (m < (next_send + 10))) {
-        if (have_data > 0) {
-            radio_send_packet(have_data, pkt);
-            have_data = 0;
+    if ((m >= next_send) && (m < (next_send + beacon.slot_size))) {
+        buffer_t *buf = &buffers[node_id];
+        if (buf->len > 0) {
+            radio_send_packet(buf->len, buf->data);
+            buf->len = 0;
         }
     }
 
     // handle received packets
     if (radio_packet_avail()) {
         uint8_t len;
-        uint8_t buf[64];
-        radio_recv_packet(&len, buf, sizeof(buf));
-        if (buf[2] == 0x00) {
-            // beacon
-            memcpy(&beacon, &buf[3], sizeof(beacon));
-//            Serial.print("beacon: time=");
-//            Serial.print(beacon.time);
-//            Serial.print(",frame=");
-//            Serial.println(beacon.frame);
+        uint8_t rcv[64];
+        radio_recv_packet(&len, rcv, sizeof(rcv));
+        uint8_t node = rcv[1];
+        uint8_t flags = rcv[2];
+        switch (flags) {
+
+        case 0x00:
+            // decode beacon packet
+            memcpy(&beacon, &rcv[3], sizeof(beacon));
             // determine next send time
             next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
-        } else if (buf[2] == 0x01) {
+            break;
+
+        case 0x01:
             // ping received
-            uint8_t node = buf[1];
-            Serial.print("Got ping from ");
-            Serial.print(node);
-            Serial.println(", sending pong...");
-            // prepare pong
-            int idx = 0;
-            pkt[idx++] = node;
-            pkt[idx++] = node_id;
-            pkt[idx++] = 0x02;      // pong
-            have_data = idx;
-        } else {
+            Serial.print("!ping ");
+            Serial.println(node, HEX);
+            // prepare pong message
+            fill_buffer(node, 0x02, 0, NULL);
+            break;
+
+        case 0x02:
+            // pong received
+            Serial.print("!pong ");
+            Serial.println(node, HEX);
+            break;
+
+        default:
+            // copy data into buffer and indicate reception
+            buffer_t *buf = &buffers[node];  // TODO BSI check node in range
+            memcpy(&buf->data, buf, len);
+
+            Serial.print("!r ");
+            Serial.print(node, HEX);
+            Serial.print(" ");
+            Serial.println(len);
+
             Serial.print("Got:");
             for (int i = 0; i < len; i++) {
-                uint8_t b = buf[i];
+                uint8_t b = rcv[i];
                 Serial.print((b >> 4) & 0xF);
                 Serial.print((b >> 0) & 0xF);
             }
             Serial.println(".");
+            break;
         }
     }
 
