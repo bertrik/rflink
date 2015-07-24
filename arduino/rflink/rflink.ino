@@ -31,7 +31,7 @@ static uint8_t node_id;
 
 typedef struct {
     uint8_t len;
-    uint8_t data[64];
+    uint8_t data[63];
 } buffer_t;
 
 static buffer_t buffers[9];
@@ -105,10 +105,97 @@ static int do_ping(int argc, char *argv[])
     return 0;
 }
 
+static uint8_t hexdigit(char c)
+{
+    if (c >= 'a') {
+        return c - 'a' + 10;
+    } else if (c >= 'A') {
+        return c - 'A' + 10;
+    } else {
+        return c - '0';
+    }
+}
+
+static int decode_hex(char *s, uint8_t *buf, int size)
+{
+    int len = strlen(s);
+    if ((len % 2) != 0) {
+        return 0;
+    }
+    if ((len / 2) > size) {
+        return 0;
+    }
+    for (int i = 0; i < len; i +=2) {
+        uint8_t b = (hexdigit(s[i]) << 4) + hexdigit(s[i + 1]);
+        *buf++ = b;
+    }
+    return len / 2;
+}
+
+static int do_send(int argc, char *argv[])
+{
+    if (argc != 4) {
+        return -1;
+    }
+    uint8_t node = atoi(argv[1]);
+    uint8_t type = atoi(argv[2]);
+    uint8_t buf[64];
+    int len = decode_hex(argv[3], buf, sizeof(buf));
+    if (len < 0) {
+        Serial.println("invalid hex");
+        return -1;  // TODO BSI sensible error code
+    }
+
+    fill_buffer(node, type, len, buf);
+
+    Serial.print(argv[0]);
+    Serial.println(" 00");
+    return 0;
+}
+
+static void printhex(uint8_t *rcv, int len)
+{
+    for (int i = 0; i < len; i++) {
+        uint8_t b = rcv[i];
+        Serial.print((b >> 4) & 0xF, HEX);
+        Serial.print((b >> 0) & 0xF, HEX);
+    }
+}
+
+static int do_recv(int argc, char *argv[])
+{
+    if (argc != 2) {
+        return -1;
+    }
+    uint8_t node = atoi(argv[1]);
+    buffer_t *buf = &buffers[node];
+    if (buf->len == 0) {
+        // nothing to read
+        Serial.println("no data");
+        return -1;
+    }
+
+    uint8_t dest = buf->data[0];
+    uint8_t type = buf->data[2];
+
+    Serial.print(argv[0]);
+    Serial.print(" ");
+    Serial.print(dest, HEX);
+    Serial.print(" ");
+    Serial.print(type, HEX);
+    Serial.print(" ");
+    printhex(buf->data, buf->len);
+    Serial.println("");
+
+    return 0;
+}
+
 static const cmd_t commands[] = {
     {"help",    do_help,    "lists all commands"},
     {"id",      do_id,      "[id] gets/sets the node id"},
     {"ping",    do_ping,    "[node] sends a ping to node"},
+    {"s",       do_send,    "[node] [type] [data] sends data"},
+    {"r",       do_recv,    "[node] returns data from buffer"},
     {"", NULL, ""}
 };
 
@@ -217,19 +304,18 @@ void loop()
         default:
             // copy data into buffer and indicate reception
             buffer_t *buf = &buffers[node];  // TODO BSI check node in range
-            memcpy(&buf->data, buf, len);
+            memcpy(&buf->data, rcv, len);
+            buf->len = len;
 
             Serial.print("!r ");
             Serial.print(node, HEX);
             Serial.print(" ");
+            Serial.print(flags, HEX);
+            Serial.print(" ");
             Serial.println(len);
 
             Serial.print("Got:");
-            for (int i = 0; i < len; i++) {
-                uint8_t b = rcv[i];
-                Serial.print((b >> 4) & 0xF);
-                Serial.print((b >> 0) & 0xF);
-            }
+            printhex(rcv, len);
             Serial.println(".");
             break;
         }
