@@ -45,6 +45,14 @@ typedef struct {
     uint8_t data[63];
 } buffer_t;
 
+typedef struct {
+    uint32_t time;
+    uint8_t frame;
+    uint8_t slot_offs;
+    uint8_t slot_size;
+} beacon_t;
+
+static beacon_t beacon;
 static buffer_t buffers[9];
 
 static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
@@ -192,8 +200,13 @@ static int do_time(int argc, char *argv[])
         // recalculate time offset
         time_offset = time - millis();
     }
-    print("%s 00 %l\n", argv[0], time);
+    print("%s 00 %lu\n", argv[0], time);
     return 0;
+}
+
+static int do_beacon(int argc, char *argv[])
+{
+    print("%s 00 %lu %d %d %d\n", argv[0], beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
 }
 
 static const cmd_t commands[] = {
@@ -203,15 +216,9 @@ static const cmd_t commands[] = {
     {"s",       do_send,    "[node] [type] [data] sends data"},
     {"r",       do_recv,    "[node] returns data from buffer"},
     {"time",    do_time,    "[time] gets/set the time"},
+    {"b",       do_beacon,  "shows last received beacon"},
     {"", NULL, ""}
 };
-
-typedef struct {
-    uint32_t time;
-    uint8_t frame;
-    uint8_t slot_offs;
-    uint8_t slot_size;
-} beacon_t;
 
 static int do_help(int argc, char *argv[])
 {
@@ -222,7 +229,6 @@ static int do_help(int argc, char *argv[])
     }
 }
 
-static beacon_t beacon;
 
 void loop()
 {
