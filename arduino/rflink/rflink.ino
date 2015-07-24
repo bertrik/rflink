@@ -195,7 +195,7 @@ static int do_time(int argc, char *argv[])
 {
     uint32_t time = millis() + time_offset;
     if (argc == 2) {
-        time = atoi(argv[1]);
+        time = strtoul(argv[1], NULL, 0);
         // recalculate time offset
         time_offset = time - millis();
     }
