@@ -67,13 +67,12 @@ static int do_id(int argc, char *argv[])
     uint8_t node_id = id_read();
     if (argc >= 2) {
         node_id = atoi(argv[1]);
-        Serial.print("Setting id to ");
-        Serial.print(node_id);
         id_write(node_id);
         radio_init(node_id);
    }
-   Serial.print("id = ");
+   Serial.print("id 00 ");
    Serial.println(node_id);
+   return 0;
 }
 
 static int do_ping(int argc, char *argv[])
