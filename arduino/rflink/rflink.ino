@@ -325,11 +325,7 @@ void loop()
             buf->len = len;
 
             Serial.print("!r ");
-            Serial.print(node, HEX);
-            Serial.print(" ");
-            Serial.print(flags, HEX);
-            Serial.print(" ");
-            Serial.println(len);
+            Serial.println(node, HEX);
 
             Serial.print("Got:");
             printhex(rcv, len);
