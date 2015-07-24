@@ -13,6 +13,9 @@
 // EEPROM address of node id
 #define EE_ADDR_ID  0
 
+// number of time division slots
+#define NUM_SLOTS   9
+
 static void print(char *fmt, ...)
 {
     char buf[128]; // resulting string limited to 128 chars
@@ -53,7 +56,7 @@ typedef struct {
 } beacon_t;
 
 static beacon_t beacon;
-static buffer_t buffers[9];
+static buffer_t buffers[NUM_SLOTS];
 
 static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 {
@@ -184,10 +187,12 @@ static int do_recv(int argc, char *argv[])
 
     uint8_t dest = buf->data[0];
     uint8_t type = buf->data[2];
-
     print("%s 00 %02X %02X ", argv[0], dest, type);
     printhex(&buf->data[3], buf->len - 3);
     print("\n");
+
+    // mark buffer as empty
+    buf->len = 0;
 
     return 0;
 }
@@ -209,6 +214,15 @@ static int do_beacon(int argc, char *argv[])
     print("%s 00 %lu %d %d %d\n", argv[0], beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
 }
 
+static int do_status(int argc, char *argv[])
+{
+    print("%s ", argv[0]);
+    for (int i = 0; i < NUM_SLOTS; i++) {
+        print("%c", buffers[i].len > 0 ? '1' : '0');
+    }
+    print("\n");
+}
+
 static const cmd_t commands[] = {
     {"help",    do_help,    "lists all commands"},
     {"id",      do_id,      "[id] gets/sets the node id"},
@@ -216,7 +230,8 @@ static const cmd_t commands[] = {
     {"s",       do_send,    "[node] [type] [data] sends data"},
     {"r",       do_recv,    "[node] returns data from buffer"},
     {"time",    do_time,    "[time] gets/set the time"},
-    {"b",       do_beacon,  "shows last received beacon"},
+    {"b",       do_beacon,  "shows current beacon info"},
+    {"?",       do_status,  "shows current buffer status"},
     {"", NULL, ""}
 };
 
@@ -315,10 +330,13 @@ void loop()
         default:
             // copy data into buffer and indicate reception
             buffer_t *buf = &buffers[node];  // TODO BSI check node in range
+            if (buf->len == 0) {
+                // only indicate when buffer status changes (empty->full)
+                print("!r %02X\n", node);
+            }
             memcpy(&buf->data, rcv, len);
             buf->len = len;
 
-            print("!r %02X\n", node);
             break;
         }
     }
