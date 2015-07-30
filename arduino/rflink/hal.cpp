@@ -1,25 +1,21 @@
 #include "Arduino.h"
 #include "SPI.h"
+#include "EEPROM.h"
 
 #include "hal.h"
 
 // serial functions
-void serial_init(void)
-{
-    // nothing to do yet
-}
-
-void serial_setup(int speed, int flags)
+void serial_init(int speed)
 {
     Serial.begin(speed);
 }
 
-void serial_write(char c)
+void serial_putc(char c)
 {
     Serial.write(c);
 }
 
-int serial_read(void)
+int serial_getc(void)
 {
     return Serial.read();
 }
@@ -56,7 +52,19 @@ uint8_t spi_transfer(uint8_t in)
     return SPI.transfer(in);
 }
 
-
 // time functions
-int32_t time_getms(void);
-void time_setms(int32_t time);
+int32_t time_millis(void)
+{
+    return millis();
+}
+
+// non-volatile functions
+uint8_t nv_read(int addr)
+{
+    return EEPROM.read(addr);
+}
+
+void nv_write(int addr, uint8_t data)
+{
+    EEPROM.write(addr, data);
+}

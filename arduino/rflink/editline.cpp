@@ -1,13 +1,13 @@
 #include <stdbool.h>
 
-#include <Arduino.h>
+#include "hal.h"
 
 #define BELL    0x07
 #define BS      0x08
 #define LF      0x0A
 #define CR      0x0D
 
-/* Processes a character into an edit buffer, returns true 
+/* Processes a character into an edit buffer, returns true
  * @param c the character to process
  * @param buf the edit buffer
  * @param size the size of the buffer
@@ -23,7 +23,7 @@ bool line_edit(char c, char *buf, int size)
     case LF:
         // finish
         buf[index] = 0;
-        Serial.write(c);
+        serial_putc(c);
         index = 0;
         return true;
 
@@ -31,12 +31,12 @@ bool line_edit(char c, char *buf, int size)
     case 127:
         // backspace
         if (index > 0) {
-            Serial.write(BS);
-            Serial.write(' ');
-            Serial.write(BS);
+            serial_putc(BS);
+            serial_putc(' ');
+            serial_putc(BS);
             index--;
         } else {
-            Serial.write(BELL);
+            serial_putc(BELL);
         }
         break;
 
@@ -44,9 +44,9 @@ bool line_edit(char c, char *buf, int size)
         // try to add character to buffer
         if (index < (size - 1)) {
             buf[index++] = c;
-            Serial.write(c);
+            serial_putc(c);
         } else {
-            Serial.write(BELL);
+            serial_putc(BELL);
         }
         break;
     }

@@ -14,15 +14,17 @@ void spi_select(bool enable);
 uint8_t spi_transfer(uint8_t in);
 
 // serial functions
-void serial_init(void);
-void serial_setup(int speed, int flags);
-void serial_write(char c);
-int serial_read(void);
+void serial_init(int speed);
+void serial_putc(char c);
+int serial_getc(void);
 bool serial_avail(void);
+void serial_write(char *s);
 
 // time functions
-int32_t time_getms(void);
-void time_setms(int32_t time);
+int32_t time_millis(void);
 
+// non-volatile functions
+uint8_t nv_read(int addr);
+void nv_write(int addr, uint8_t data);
 
 #endif /* HAL_H */

@@ -18,24 +18,30 @@
 
 static void print(char *fmt, ...)
 {
-    char buf[128]; // resulting string limited to 128 chars
+    // format it
+    char buf[128];
     va_list args;
     va_start (args, fmt);
     vsnprintf(buf, 128, fmt, args);
     va_end (args);
-    Serial.print(buf);
+
+    // send it to serial
+    char *p = buf;
+    while (*p != 0) {
+        serial_putc(*p);
+    }
 }
 
 static uint8_t id_read(void)
 {
-    return EEPROM.read(EE_ADDR_ID);
+    return nv_read(EE_ADDR_ID);
 }
 
 static void id_write(uint8_t id)
 {
-    uint8_t old = EEPROM.read(EE_ADDR_ID);
+    uint8_t old = nv_read(EE_ADDR_ID);
     if (id != old) {
-        EEPROM.write(EE_ADDR_ID, id);
+        nv_write(EE_ADDR_ID, id);
     }
 }
 
@@ -75,18 +81,16 @@ static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 
 void setup()
 {
-    Serial.begin(57600);
-    Serial.println("RFLINK");
+    serial_init(57600);
 
     // read node id from eeprom
     node_id = id_read();
-    print("node id = %02X\n", node_id);
 
     // SPI init
     spi_init(1000000L, 0);
 
     bool ok = radio_init(node_id);
-    print("radio_init = %s\n", ok ? "OK" : "FAIL");
+    print("#RFLINK,id=%d,%s\n", node_id, ok ? "OK" : "FAIL");
 }
 
 // forward declaration
@@ -199,11 +203,12 @@ static int do_recv(int argc, char *argv[])
 
 static int do_time(int argc, char *argv[])
 {
-    uint32_t time = millis() + time_offset;
+    uint32_t m = time_millis();
+    uint32_t time = m + time_offset;
     if (argc == 2) {
         time = strtoul(argv[1], NULL, 0);
         // recalculate time offset
-        time_offset = time - millis();
+        time_offset = time - m;
     }
     print("%s 00 %lu\n", argv[0], time);
     return 0;
@@ -253,7 +258,7 @@ void loop()
     static unsigned long int next_send;
 
     // command processing
-    if (Serial.available() > 0) {
+    if (serial_avail()) {
         char c = Serial.read();
         if (line_edit(c, textbuffer, sizeof(textbuffer))) {
             int res = cmd_process(commands, textbuffer);
@@ -261,7 +266,7 @@ void loop()
     }
 
     // radio processing
-    unsigned long int m = millis();
+    uint32_t m = time_millis();
 
     // do beacon processing if we are master
     if (node_id == 0) {
