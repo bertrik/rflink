@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "radio.h"
+#include "rfm69.h"
 #include "cmdproc.h"
 #include "editline.h"
 #include "hal.h"
