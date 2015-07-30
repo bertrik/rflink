@@ -100,7 +100,7 @@ static int do_id(int argc, char *argv[])
         id_write(node_id);
         radio_init(node_id);
     }
-    print("%s 00 %02X\n", argv[0], node_id);
+    print("00 %02X\n", node_id);
     return 0;
 }
 
@@ -114,7 +114,7 @@ static int do_ping(int argc, char *argv[])
     // prepare ping message
     fill_buffer(node, PKT_TYPE_PING, 0, NULL);
 
-    print("%s 00 %02X\n", argv[0], node);
+    print("00 %02X\n", node);
     return 0;
 }
 
@@ -160,7 +160,7 @@ static int do_send(int argc, char *argv[])
 
     fill_buffer(node, type, len, buf);
 
-    print("%s 00\n", argv[0]);
+    print("00\n");
     return 0;
 }
 
@@ -185,7 +185,7 @@ static int do_recv(int argc, char *argv[])
 
     uint8_t dest = buf->data[PKT_OFFS_DST];
     uint8_t type = buf->data[PKT_OFFS_TYPE];
-    print("%s 00 %02X %02X ", argv[0], dest, type);
+    print("00 %02X %02X ", dest, type);
     printhex(&buf->data[PKT_OFFS_DATA], buf->len - PKT_OFFS_DATA);
     print("\n");
 
@@ -204,19 +204,19 @@ static int do_time(int argc, char *argv[])
         // recalculate time offset
         time_offset = time - m;
     }
-    print("%s 00 %lu\n", argv[0], time);
+    print("00 %lu\n", time);
     return 0;
 }
 
 static int do_beacon(int argc, char *argv[])
 {
-    print("%s 00 %lu %d %d %d\n", argv[0], beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
+    print("00 %lu %d %d %d\n", beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
     return 0;
 }
 
 static int do_status(int argc, char *argv[])
 {
-    print("%s ", argv[0]);
+    print("00 ");
     for (int i = 0; i < NUM_SLOTS; i++) {
         print("%c", buffers[i].len > 0 ? '1' : '0');
     }
@@ -259,7 +259,7 @@ void setup(void)
     spi_init(1000000L, 0);
 
     bool ok = radio_init(node_id);
-    print("#RFLINK,id=%d,%s\n", node_id, ok ? "OK" : "FAIL");
+    print("#RFLINK,id=%d,init=%s\n", node_id, ok ? "OK" : "FAIL");
 }
 
 void loop(void)
@@ -272,6 +272,7 @@ void loop(void)
     if (serial_avail()) {
         char c = Serial.read();
         if (line_edit(c, textbuffer, sizeof(textbuffer))) {
+            print("<");
             int res = cmd_process(commands, textbuffer);
             if (res < 0) {
                 res = ERR_PARSE;;
