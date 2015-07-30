@@ -6,15 +6,47 @@
 #include "cmdproc.h"
 #include "editline.h"
 #include "hal.h"
+#include "radio.h"
 
+// Arduino needs these in the .ino file ...
 #include "SPI.h"
 #include "EEPROM.h"
 
+
 // EEPROM address of node id
 #define EE_ADDR_ID  0
-
 // number of time division slots
 #define NUM_SLOTS   9
+// structure of a raw packet
+#define PKT_OFFS_DST    0
+#define PKT_OFFS_SRC    1
+#define PKT_OFFS_TYPE   2
+#define PKT_OFFS_DATA   3
+
+
+// structure of a packet buffer
+typedef struct {
+    uint8_t len;
+    uint8_t data[63];
+} buffer_t;
+
+// structure of a beacon packet
+typedef struct {
+    uint32_t time;
+    uint8_t frame;
+    uint8_t slot_offs;
+    uint8_t slot_size;
+} beacon_t;
+
+// our node id
+static uint8_t node_id;
+// the current time offset between our clock and the master (milliseconds)
+static int32_t time_offset = 0;
+// latest received beacon packet
+static beacon_t beacon;
+// array of packet buffers, one for each node
+static buffer_t buffers[NUM_SLOTS];
+
 
 static void print(char *fmt, ...)
 {
@@ -45,25 +77,6 @@ static void id_write(uint8_t id)
     }
 }
 
-
-static uint8_t node_id;
-static int32_t time_offset = 0;
-
-typedef struct {
-    uint8_t len;
-    uint8_t data[63];
-} buffer_t;
-
-typedef struct {
-    uint32_t time;
-    uint8_t frame;
-    uint8_t slot_offs;
-    uint8_t slot_size;
-} beacon_t;
-
-static beacon_t beacon;
-static buffer_t buffers[NUM_SLOTS];
-
 static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 {
     // select our own node buffer as send buffer
@@ -71,30 +84,13 @@ static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 
     // fill it
     buf->len = 3 + len;
-    buf->data[0] = to;
-    buf->data[1] = node_id;
-    buf->data[2] = flags;
+    buf->data[PKT_OFFS_DST] = to;
+    buf->data[PKT_OFFS_SRC] = node_id;
+    buf->data[PKT_OFFS_TYPE] = flags;
     if (len > 0) {
-        memcpy(&buf->data[3], data, len);
+        memcpy(&buf->data[PKT_OFFS_DATA], data, len);
     }
 }
-
-void setup()
-{
-    serial_init(57600);
-
-    // read node id from eeprom
-    node_id = id_read();
-
-    // SPI init
-    spi_init(1000000L, 0);
-
-    bool ok = radio_init(node_id);
-    print("#RFLINK,id=%d,%s\n", node_id, ok ? "OK" : "FAIL");
-}
-
-// forward declaration
-static int do_help(int argc, char *argv[]);
 
 static int do_id(int argc, char *argv[])
 {
@@ -111,12 +107,12 @@ static int do_id(int argc, char *argv[])
 static int do_ping(int argc, char *argv[])
 {
     uint8_t node = 0xFF;
-    if (argc >= 2) {
+    if (argc > 1) {
         node = atoi(argv[1]);
     }
 
     // prepare ping message
-    fill_buffer(node, 0x01, 0, NULL);
+    fill_buffer(node, PKT_TYPE_PING, 0, NULL);
 
     print("%s 00 %02X\n", argv[0], node);
     return 0;
@@ -152,15 +148,14 @@ static int decode_hex(char *s, uint8_t *buf, int size)
 static int do_send(int argc, char *argv[])
 {
     if (argc != 4) {
-        return -1;
+        return ERR_PARAM;
     }
     uint8_t node = atoi(argv[1]);
     uint8_t type = atoi(argv[2]);
     uint8_t buf[64];
     int len = decode_hex(argv[3], buf, sizeof(buf));
-    if (len < 0) {
-        Serial.println("invalid hex");
-        return -1;  // TODO BSI sensible error code
+    if (len <= 0) {
+        return ERR_PARAM;
     }
 
     fill_buffer(node, type, len, buf);
@@ -179,20 +174,19 @@ static void printhex(uint8_t *rcv, int len)
 static int do_recv(int argc, char *argv[])
 {
     if (argc != 2) {
-        return -1;
+        return ERR_PARAM;
     }
     uint8_t node = atoi(argv[1]);
     buffer_t *buf = &buffers[node];
     if (buf->len == 0) {
         // nothing to read
-        Serial.println("no data");
-        return -1;
+        return ERR_NO_DATA;
     }
 
-    uint8_t dest = buf->data[0];
-    uint8_t type = buf->data[2];
+    uint8_t dest = buf->data[PKT_OFFS_DST];
+    uint8_t type = buf->data[PKT_OFFS_TYPE];
     print("%s 00 %02X %02X ", argv[0], dest, type);
-    printhex(&buf->data[3], buf->len - 3);
+    printhex(&buf->data[PKT_OFFS_DATA], buf->len - PKT_OFFS_DATA);
     print("\n");
 
     // mark buffer as empty
@@ -217,6 +211,7 @@ static int do_time(int argc, char *argv[])
 static int do_beacon(int argc, char *argv[])
 {
     print("%s 00 %lu %d %d %d\n", argv[0], beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
+    return 0;
 }
 
 static int do_status(int argc, char *argv[])
@@ -226,7 +221,11 @@ static int do_status(int argc, char *argv[])
         print("%c", buffers[i].len > 0 ? '1' : '0');
     }
     print("\n");
+    return 0;
 }
+
+// forward declaration of help function
+static int do_help(int argc, char *argv[]);
 
 static const cmd_t commands[] = {
     {"help",    do_help,    "lists all commands"},
@@ -249,19 +248,37 @@ static int do_help(int argc, char *argv[])
     }
 }
 
+void setup(void)
+{
+    serial_init(57600);
 
-void loop()
+    // read node id from eeprom
+    node_id = id_read();
+
+    // SPI init
+    spi_init(1000000L, 0);
+
+    bool ok = radio_init(node_id);
+    print("#RFLINK,id=%d,%s\n", node_id, ok ? "OK" : "FAIL");
+}
+
+void loop(void)
 {
     static char textbuffer[150];
     static int prev_sec = 0;
-    static int count = 0;
-    static unsigned long int next_send;
+    static uint32_t next_send;
 
     // command processing
     if (serial_avail()) {
         char c = Serial.read();
         if (line_edit(c, textbuffer, sizeof(textbuffer))) {
             int res = cmd_process(commands, textbuffer);
+            if (res < 0) {
+                res = ERR_PARSE;;
+            }
+            if (res > 0) {
+                print("%02X\n", res);
+            }
         }
     }
 
@@ -280,14 +297,12 @@ void loop()
             beacon.slot_size = 10;
             // create packet
             uint8_t buf[16];
-            int idx = 0;
-            buf[idx++] = 0xFF;      // to: broadcast
-            buf[idx++] = node_id;   // from: us
-            buf[idx++] = 0x00;      // command?
-            memcpy(&buf[idx], &beacon, sizeof(beacon));
-            idx += sizeof(beacon);
+            buf[PKT_OFFS_DST] = 0xFF;      // to: broadcast
+            buf[PKT_OFFS_SRC] = node_id;   // from: us
+            buf[PKT_OFFS_TYPE] = 0x00;      // command?
+            memcpy(&buf[PKT_OFFS_DATA], &beacon, sizeof(beacon));
             // send it
-            radio_send_packet(idx, buf);
+            radio_send_packet(PKT_OFFS_DATA + sizeof(beacon), buf);
             // configure our own send slot
             next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
         }
@@ -298,7 +313,7 @@ void loop()
         buffer_t *buf = &buffers[node_id];
         if (buf->len > 0) {
             radio_send_packet(buf->len, buf->data);
-            uint8_t node = buf->data[0];
+            uint8_t node = buf->data[PKT_OFFS_DST];
             print("!s 00 %02X\n", node);
             buf->len = 0;
         }
@@ -309,27 +324,27 @@ void loop()
         uint8_t len;
         uint8_t rcv[64];
         radio_recv_packet(&len, rcv, sizeof(rcv));
-        uint8_t node = rcv[1];
-        uint8_t flags = rcv[2];
+        uint8_t node = rcv[PKT_OFFS_SRC];
+        uint8_t flags = rcv[PKT_OFFS_TYPE];
         switch (flags) {
 
-        case 0x00:
+        case PKT_TYPE_BEACON:
             // decode beacon packet
-            memcpy(&beacon, &rcv[3], sizeof(beacon));
+            memcpy(&beacon, &rcv[PKT_OFFS_DATA], sizeof(beacon));
             // determine next send time
             next_send = m + beacon.slot_offs + (beacon.slot_size * node_id);
             // recalculate time offset
             time_offset = beacon.time - m;
             break;
 
-        case 0x01:
+        case PKT_TYPE_PING:
             // ping received
             print("!ping %02X\n", node);
             // prepare pong message
-            fill_buffer(node, 0x02, 0, NULL);
+            fill_buffer(node, PKT_TYPE_PONG, 0, NULL);
             break;
 
-        case 0x02:
+        case PKT_TYPE_PONG:
             // pong received
             print("!pong %02X\n", node);
             break;
@@ -343,7 +358,6 @@ void loop()
             }
             memcpy(&buf->data, rcv, len);
             buf->len = len;
-
             break;
         }
     }

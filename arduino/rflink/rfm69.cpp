@@ -1,6 +1,6 @@
 #include "hal.h"
 
-#include "RFM69_const.h"
+#include "rfm69_const.h"
 #include "rfm69.h"
 
 // configuration for use of the band between 869.7 and 870.0 MHz
