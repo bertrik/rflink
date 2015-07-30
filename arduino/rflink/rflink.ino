@@ -38,6 +38,8 @@ typedef struct {
     uint8_t slot_size;
 } beacon_t;
 
+// whether radio initialisation was successful
+static boolean radio_ok = false;
 // our node id
 static uint8_t node_id;
 // the current time offset between our clock and the master (milliseconds)
@@ -77,6 +79,11 @@ static void id_write(uint8_t id)
     }
 }
 
+static bool node_valid(uint8_t id)
+{
+    return (id < NUM_SLOTS);
+}
+
 static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 {
     // select our own node buffer as send buffer
@@ -94,11 +101,15 @@ static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 
 static int do_id(int argc, char *argv[])
 {
-    uint8_t node_id = id_read();
-    if (argc >= 2) {
-        node_id = atoi(argv[1]);
-        id_write(node_id);
-        radio_init(node_id);
+    uint8_t node = id_read();
+    if (argc == 2) {
+        node = atoi(argv[1]);
+        if (!node_valid(node)) {
+            return ERR_PARAM;
+        }
+        id_write(node);
+        radio_init(node);
+        node_id = node;
     }
     print("00 %02X\n", node_id);
     return 0;
@@ -109,6 +120,9 @@ static int do_ping(int argc, char *argv[])
     uint8_t node = 0xFF;
     if (argc > 1) {
         node = atoi(argv[1]);
+    }
+    if (!node_valid(node)) {
+        return ERR_PARAM;
     }
 
     // prepare ping message
@@ -151,6 +165,9 @@ static int do_send(int argc, char *argv[])
         return ERR_PARAM;
     }
     uint8_t node = atoi(argv[1]);
+    if (!node_valid(node)) {
+        return ERR_PARAM;
+    }
     uint8_t type = atoi(argv[2]);
     uint8_t buf[64];
     int len = decode_hex(argv[3], buf, sizeof(buf));
@@ -177,6 +194,9 @@ static int do_recv(int argc, char *argv[])
         return ERR_PARAM;
     }
     uint8_t node = atoi(argv[1]);
+    if (!node_valid(node)) {
+        return ERR_PARAM;
+    }
     buffer_t *buf = &buffers[node];
     if (buf->len == 0) {
         // nothing to read
@@ -258,8 +278,8 @@ void setup(void)
     // SPI init
     spi_init(1000000L, 0);
 
-    bool ok = radio_init(node_id);
-    print("#RFLINK,id=%d,init=%s\n", node_id, ok ? "OK" : "FAIL");
+    radio_ok = radio_init(node_id);
+    print("#RFLINK,id=%d,init=%s\n", node_id, radio_ok ? "OK" : "FAIL");
 }
 
 void loop(void)
@@ -281,6 +301,11 @@ void loop(void)
                 print("%02X\n", res);
             }
         }
+    }
+
+    // verify conditions for doing any radio processing
+    if (!radio_ok || !node_valid(node_id)) {
+        return;
     }
 
     // radio processing
@@ -352,13 +377,15 @@ void loop(void)
 
         default:
             // copy data into buffer and indicate reception
-            buffer_t *buf = &buffers[node];  // TODO BSI check node in range
-            if (buf->len == 0) {
-                // only indicate when buffer status changes (empty->full)
-                print("!r %02X\n", node);
+            if (node_valid(node)) {
+                buffer_t *buf = &buffers[node];
+                if (buf->len == 0) {
+                    // only indicate when buffer status changes (empty->full)
+                    print("!r %02X\n", node);
+                }
+                memcpy(&buf->data, rcv, len);
+                buf->len = len;
             }
-            memcpy(&buf->data, rcv, len);
-            buf->len = len;
             break;
         }
     }
