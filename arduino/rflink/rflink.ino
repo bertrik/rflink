@@ -62,7 +62,7 @@ static void print(char *fmt, ...)
     // send it to serial
     char *p = buf;
     while (*p != 0) {
-        serial_putc(*p);
+        serial_putc(*p++);
     }
 }
 
@@ -120,9 +120,6 @@ static int do_ping(int argc, char *argv[])
     uint8_t node = ADDR_BROADCAST;
     if (argc > 1) {
         node = atoi(argv[1]);
-    }
-    if (!node_valid(node)) {
-        return ERR_PARAM;
     }
 
     // prepare ping message
