@@ -117,7 +117,7 @@ static int do_id(int argc, char *argv[])
 
 static int do_ping(int argc, char *argv[])
 {
-    uint8_t node = 0xFF;
+    uint8_t node = ADDR_BROADCAST;
     if (argc > 1) {
         node = atoi(argv[1]);
     }
@@ -323,9 +323,9 @@ void loop(void)
             beacon.slot_size = 10;
             // create packet
             uint8_t buf[16];
-            buf[PKT_OFFS_DST] = 0xFF;      // to: broadcast
-            buf[PKT_OFFS_SRC] = node_id;   // from: us
-            buf[PKT_OFFS_TYPE] = 0x00;      // command?
+            buf[PKT_OFFS_DST] = ADDR_BROADCAST;
+            buf[PKT_OFFS_SRC] = node_id;
+            buf[PKT_OFFS_TYPE] = PKT_TYPE_BEACON;
             memcpy(&buf[PKT_OFFS_DATA], &beacon, sizeof(beacon));
             // send it
             radio_send_packet(PKT_OFFS_DATA + sizeof(beacon), buf);

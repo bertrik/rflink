@@ -11,3 +11,6 @@
 #define ERR_PARSE       0x01    // parse error
 #define ERR_PARAM       0x02    // invalid parameter
 #define ERR_NO_DATA     0x03    // no data available
+
+// node ids
+#define ADDR_BROADCAST  0xFF
