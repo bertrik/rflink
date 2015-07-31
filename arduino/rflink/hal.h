@@ -14,7 +14,7 @@ void spi_select(bool enable);
 uint8_t spi_transfer(uint8_t in);
 
 // serial functions
-void serial_init(int speed);
+void serial_init(uint32_t speed);
 void serial_putc(char c);
 int serial_getc(void);
 bool serial_avail(void);

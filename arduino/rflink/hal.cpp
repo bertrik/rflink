@@ -5,7 +5,7 @@
 #include "hal.h"
 
 // serial functions
-void serial_init(int speed)
+void serial_init(uint32_t speed)
 {
     Serial.begin(speed);
 }
