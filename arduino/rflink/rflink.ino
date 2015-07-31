@@ -241,6 +241,18 @@ static int do_status(int argc, char *argv[])
     return 0;
 }
 
+static int do_power(int argc, char *argv[])
+{
+    if (argc != 2) {
+        return ERR_PARAM;
+    }
+    int dbm = atoi(argv[1]);
+    dbm = radio_set_power(dbm);
+    // show actual power
+    print("00 %d\n", dbm);
+    return 0;
+}
+
 // forward declaration of help function
 static int do_help(int argc, char *argv[]);
 
@@ -253,6 +265,7 @@ static const cmd_t commands[] = {
     {"time",    do_time,    "[time] gets/set the time"},
     {"b",       do_beacon,  "shows current beacon info"},
     {"?",       do_status,  "shows current buffer status"},
+    {"power",   do_power,   "<dbm> sets transmitter power"},
     {"", NULL, ""}
 };
 

@@ -5,8 +5,8 @@
 
 // configuration for use of the band between 869.7 and 870.0 MHz
 
-#define RADIO_FREQUENCY_KHZ 869850
-#define RADIO_POWER     0
+#define RADIO_FREQUENCY_KHZ 869850L
+#define RADIO_POWER_DBM     0
 
 // write data to a radio register
 static void radio_write(uint8_t reg, uint8_t * data, int len)
@@ -102,6 +102,30 @@ void radio_send_packet(uint8_t len, uint8_t * data)
     radio_mode_recv();
 }
 
+// set transmitter powers, returns actually configured power
+int radio_set_power(int dbm)
+{
+    if (dbm < -2) {
+        // 0.6 mW
+        dbm = -2;
+    }
+    if (dbm > 13) {
+        // 20 mW
+        dbm = 13;
+    }
+
+    radio_write_reg(RFM69_PA_LEVEL, (1 << 6) | (dbm + 18));     // PA1ON
+    return dbm;
+}
+
+void radio_set_frequency(uint32_t khz)
+{
+    uint32_t n = khz * 2048 / 125;
+    radio_write_reg(RFM69_FRF_MSB, (n >> 16) & 0xFF);
+    radio_write_reg(RFM69_FRF_MID, (n >> 8) & 0xFF);
+    radio_write_reg(RFM69_FRF_LSB, n & 0xFF);
+}
+
 bool radio_init(uint8_t node_id)
 {
     // check version register
@@ -115,11 +139,11 @@ bool radio_init(uint8_t node_id)
                     (0 << 3) |  // FSK
                     (2 << 0));  // Gaussian filter, BT=0.5
 
-    //  bitrate
+    //  bitrate (bitrate = Fosc / value)
     radio_write_reg(RFM69_BITRATE_MSB, 0x01);
     radio_write_reg(RFM69_BITRATE_LSB, 0x00);
 
-    // deviation
+    // deviation (deviation = value * Fosc / 2^19)
     radio_write_reg(RFM69_FDEV_MSB, 0x02);
     radio_write_reg(RFM69_FDEV_LSB, 0x00);
 
@@ -134,7 +158,7 @@ bool radio_init(uint8_t node_id)
     // low beta settings
     radio_write_reg(RFM69_AFC_CTRL, (1 << 5));  // AfcLowBetaOn
     radio_write_reg(RFM69_TEST_DAGC, 0x20);     // fading margin improvement
-    radio_write_reg(RFM69_TEST_AFC, 25);        // 0.04 * BW / 48 plus a bit
+    radio_write_reg(RFM69_TEST_AFC, 25);        // 0.04 * BW / 488 plus a bit
 
     // sync config
     radio_write_reg(RFM69_SYNC_CONFIG, (1 << 7) |       // sync on
@@ -151,8 +175,8 @@ bool radio_init(uint8_t node_id)
     radio_write_reg(RFM69_PREAMBLE_MSB, 0);
     radio_write_reg(RFM69_PREAMBLE_LSB, 3);
 
-    // power (use PA1, power = -18 + setting)
-    radio_write_reg(RFM69_PA_LEVEL, (1 << 6) | 18);     // PA1ON
+    // power amplifier
+    radio_set_power(RADIO_POWER_DBM);
     radio_write_reg(RFM69_PA_RAMP, 9);  // 9 -> 40 us
 
     // packet config
@@ -174,11 +198,7 @@ bool radio_init(uint8_t node_id)
     radio_write_reg(RFM69_LNA, (1 << 8));       // 200 ohm impedance, automatic gain
 
     // set frequency
-    uint32_t f = RADIO_FREQUENCY_KHZ;
-    uint32_t n = f * 2048 / 125;
-    radio_write_reg(RFM69_FRF_MSB, (n >> 16) & 0xFF);
-    radio_write_reg(RFM69_FRF_MID, (n >> 8) & 0xFF);
-    radio_write_reg(RFM69_FRF_LSB, n & 0xFF);
+    radio_set_frequency(RADIO_FREQUENCY_KHZ);
 
     // into receiver mode
     radio_mode_recv();
