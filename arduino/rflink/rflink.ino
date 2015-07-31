@@ -261,7 +261,7 @@ static int do_help(int argc, char *argv[])
     (void) argc;
     (void) argv;
     for (const cmd_t * cmd = commands; cmd->cmd != NULL; cmd++) {
-        print("%s %s\n", cmd->name, cmd->help);
+        print("%s\t%s\n", cmd->name, cmd->help);
     }
 }
 
