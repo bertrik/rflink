@@ -287,7 +287,7 @@ void loop(void)
 
     // command processing
     if (serial_avail()) {
-        char c = Serial.read();
+        char c = serial_getc();
         if (line_edit(c, textbuffer, sizeof(textbuffer))) {
             print("<");
             int res = cmd_process(commands, textbuffer);
