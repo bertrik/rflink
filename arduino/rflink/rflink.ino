@@ -267,7 +267,7 @@ static int do_help(int argc, char *argv[])
 
 void setup(void)
 {
-    serial_init(57600);
+    serial_init(57600L);
 
     // read node id from eeprom
     node_id = id_read();
