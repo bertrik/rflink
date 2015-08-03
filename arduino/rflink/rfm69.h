@@ -9,7 +9,7 @@ uint8_t radio_read_reg(uint8_t reg);
 
 bool radio_init(uint8_t node_id);
 int radio_set_power(int dbm);
-void radio_set_frequency(uint32_t khz);
+uint32_t radio_set_frequency(uint32_t khz);
 
 void radio_send_packet(uint8_t len, uint8_t *data);
 

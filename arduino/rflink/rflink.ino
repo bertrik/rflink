@@ -253,6 +253,17 @@ static int do_power(int argc, char *argv[])
     return 0;
 }
 
+static int do_freq(int argc, char *argv[])
+{
+    if (argc != 2) {
+        return ERR_PARAM;
+    }
+    uint32_t khz = strtoul(argv[1], NULL, 0);
+    khz = radio_set_frequency(khz);
+    print("00 %lu\n", khz);
+    return 0;
+}
+
 // forward declaration of help function
 static int do_help(int argc, char *argv[]);
 
@@ -266,6 +277,7 @@ static const cmd_t commands[] = {
     {"b",       do_beacon,  "shows current beacon info"},
     {"?",       do_status,  "shows current buffer status"},
     {"power",   do_power,   "<dbm> sets transmitter power"},
+    {"freq",    do_freq,    "<khz> sets frequency"},
     {"", NULL, ""}
 };
 

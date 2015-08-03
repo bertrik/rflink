@@ -118,12 +118,21 @@ int radio_set_power(int dbm)
     return dbm;
 }
 
-void radio_set_frequency(uint32_t khz)
+// sets transmitter frequency, returns actually configured frequency
+uint32_t radio_set_frequency(uint32_t khz)
 {
-    uint32_t n = khz * 2048 / 125;
+    // restrict to SRD860 band (863-870 MHz)
+    if (khz < 863000) {
+        khz = 863000L;
+    }
+    if (khz > 870000) {
+        khz = 870000L;
+    }
+    uint32_t n = ((khz * 2048) + 62) / 125;
     radio_write_reg(RFM69_FRF_MSB, (n >> 16) & 0xFF);
     radio_write_reg(RFM69_FRF_MID, (n >> 8) & 0xFF);
     radio_write_reg(RFM69_FRF_LSB, n & 0xFF);
+    return khz;
 }
 
 bool radio_init(uint8_t node_id)
