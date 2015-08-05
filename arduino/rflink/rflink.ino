@@ -265,11 +265,38 @@ static int do_freq(int argc, char *argv[])
     return 0;
 }
 
+static int do_peek(int argc, char *argv[])
+{
+    if (argc != 2) {
+        return ERR_PARAM;
+    }
+    uint8_t reg = atoi(argv[1]);
+    uint8_t val = radio_read_reg(reg);
+    print("00 %02X\n", val);
+    return 0;
+}
+
+static int do_poke(int argc, char *argv[])
+{
+    if (argc != 3) {
+        return ERR_PARAM;
+    }
+    uint8_t reg = atoi(argv[1]);
+    uint8_t val = atoi(argv[2]);
+    radio_write_reg(reg, val);
+    print("00\n");
+    return 0;
+}
+
 // forward declaration of help function
 static int do_help(int argc, char *argv[]);
 
 static const cmd_t commands[] = {
+    // unofficial useful commands
     {"help",    do_help,    "lists all commands"},
+    {"peek",    do_peek,    "<reg> gets raw RFM69 register"},
+    {"poke",    do_poke,    "<reg> <val> sets raw RFM69 register"},
+    // official documented commands
     {"id",      do_id,      "[id] gets/sets the node id"},
     {"ping",    do_ping,    "[node] sends a ping to node"},
     {"s",       do_send,    "[node] [type] [data] sends data"},
