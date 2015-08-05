@@ -180,9 +180,9 @@ bool radio_init(uint8_t node_id)
     // RSSI threshold (recommended value from datasheet)
     radio_write_reg(RFM69_RSSI_THRESH, 0xE4);
 
-    // preamble (3 bytes)
+    // preamble
     radio_write_reg(RFM69_PREAMBLE_MSB, 0);
-    radio_write_reg(RFM69_PREAMBLE_LSB, 3);
+    radio_write_reg(RFM69_PREAMBLE_LSB, 4);
 
     // power amplifier
     radio_set_power(RADIO_POWER_DBM);
