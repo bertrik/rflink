@@ -32,10 +32,11 @@ typedef struct {
 
 // structure of a beacon packet
 typedef struct {
-    uint32_t time;
-    uint8_t frame;
-    uint8_t slot_offs;
-    uint8_t slot_size;
+    uint32_t time;      // the current time
+    uint8_t frame;      // frame counter
+    uint8_t slot_offs;  // offset parameter for send slot calculation
+    uint8_t slot_size;  // size parameter for send slot calculation
+    uint8_t frame_size; // the size of the frame (ms)
 } beacon_t;
 
 // whether radio initialisation was successful
@@ -343,6 +344,7 @@ void loop(void)
             beacon.frame++;
             beacon.slot_offs = 10;
             beacon.slot_size = 10;
+            beacon.frame_size = 100;
             // create packet
             uint8_t buf[16];
             buf[PKT_OFFS_DST] = ADDR_BROADCAST;
@@ -363,7 +365,10 @@ void loop(void)
             radio_send_packet(buf->len, buf->data);
             uint8_t node = buf->data[PKT_OFFS_DST];
             print("!s 00 %02X\n", node);
+            // mark buffer as sent
             buf->len = 0;
+            // update next send time, so communication can freewheel when beacon drops away
+            next_send += beacon.frame_size;
         }
     }
 
