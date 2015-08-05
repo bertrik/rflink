@@ -66,11 +66,10 @@ bool radio_recv_packet(uint8_t * len_p, uint8_t * data, int size)
     if ((len == 0) || (len > size)) {
         return false;
     }
-    // read data
     *len_p = len;
-    for (int i = 0; i < len; i++) {
-        data[i] = radio_read_reg(RFM69_FIFO);
-    }
+
+    // read data
+    radio_read(RFM69_FIFO, data, len);
 
     return true;
 }
