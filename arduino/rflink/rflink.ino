@@ -50,7 +50,7 @@ static beacon_t beacon;
 // array of packet buffers, one for each node
 static buffer_t buffers[NUM_SLOTS];
 
-
+// formats a printf style string and sends it to the serial port
 static void print(char *fmt, ...)
 {
     // format it
@@ -67,11 +67,13 @@ static void print(char *fmt, ...)
     }
 }
 
+// reads the node id
 static uint8_t id_read(void)
 {
     return nv_read(EE_ADDR_ID);
 }
 
+// writes the node id
 static void id_write(uint8_t id)
 {
     uint8_t old = nv_read(EE_ADDR_ID);
@@ -80,11 +82,13 @@ static void id_write(uint8_t id)
     }
 }
 
+// returns true if the node id is valid (does not include broadcast node address)
 static bool node_valid(uint8_t id)
 {
     return (id < NUM_SLOTS);
 }
 
+// prepares a packet for sending, the packet is stored in buffers[our own node]
 static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
 {
     // select our own node buffer as send buffer
@@ -100,6 +104,7 @@ static void fill_buffer(uint8_t to, uint8_t flags, uint8_t len, uint8_t *data)
     }
 }
 
+// handles the "id" command
 static int do_id(int argc, char *argv[])
 {
     uint8_t node = id_read();
@@ -116,6 +121,7 @@ static int do_id(int argc, char *argv[])
     return 0;
 }
 
+// handles the "ping" command
 static int do_ping(int argc, char *argv[])
 {
     uint8_t node = ADDR_BROADCAST;
@@ -141,6 +147,8 @@ static uint8_t hexdigit(char c)
     }
 }
 
+// converts an ascii-hex encoded string to a byte-array
+// returns the number of bytes converted, 0 in case of invalid data
 static int decode_hex(char *s, uint8_t *buf, int size)
 {
     int len = strlen(s);
@@ -157,6 +165,7 @@ static int decode_hex(char *s, uint8_t *buf, int size)
     return len / 2;
 }
 
+// handles the "send" command
 static int do_send(int argc, char *argv[])
 {
     if (argc != 4) {
@@ -179,6 +188,7 @@ static int do_send(int argc, char *argv[])
     return 0;
 }
 
+// prints a byte array to the serial port as ascii-hex
 static void printhex(uint8_t *rcv, int len)
 {
     for (int i = 0; i < len; i++) {
@@ -186,6 +196,7 @@ static void printhex(uint8_t *rcv, int len)
     }
 }
 
+// handles the "receive" command
 static int do_recv(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -213,6 +224,7 @@ static int do_recv(int argc, char *argv[])
     return 0;
 }
 
+// handles the "time" command
 static int do_time(int argc, char *argv[])
 {
     uint32_t m = time_millis();
@@ -226,12 +238,14 @@ static int do_time(int argc, char *argv[])
     return 0;
 }
 
+// handles the "beacon" command
 static int do_beacon(int argc, char *argv[])
 {
     print("00 %lu %d %d %d\n", beacon.time, beacon.frame, beacon.slot_offs, beacon.slot_size);
     return 0;
 }
 
+// handles the "status (?)" command
 static int do_status(int argc, char *argv[])
 {
     print("00 ");
@@ -242,6 +256,7 @@ static int do_status(int argc, char *argv[])
     return 0;
 }
 
+// handles the "power" command
 static int do_power(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -254,6 +269,7 @@ static int do_power(int argc, char *argv[])
     return 0;
 }
 
+// handles the "frequency" command
 static int do_freq(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -265,6 +281,7 @@ static int do_freq(int argc, char *argv[])
     return 0;
 }
 
+// handles the "peek" command
 static int do_peek(int argc, char *argv[])
 {
     if (argc != 2) {
@@ -276,6 +293,7 @@ static int do_peek(int argc, char *argv[])
     return 0;
 }
 
+// handles the "poke" command
 static int do_poke(int argc, char *argv[])
 {
     if (argc != 3) {
@@ -309,6 +327,7 @@ static const cmd_t commands[] = {
     {"", NULL, ""}
 };
 
+// handles the "help" command
 static int do_help(int argc, char *argv[])
 {
     (void) argc;
@@ -318,6 +337,7 @@ static int do_help(int argc, char *argv[])
     }
 }
 
+// Arduino standard initialisation function
 void setup(void)
 {
     serial_init(57600L);
@@ -332,6 +352,7 @@ void setup(void)
     print("#RFLINK,id=%d,init=%s\n", node_id, radio_ok ? "OK" : "FAIL");
 }
 
+// Arduino standard main loop function
 void loop(void)
 {
     static char textbuffer[150];
