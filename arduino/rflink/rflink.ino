@@ -390,7 +390,7 @@ void loop(void)
             // update beacon
             beacon.time = m + time_offset;
             beacon.frame++;
-            beacon.slot_offs = 10;
+            beacon.slot_offs = 5;
             beacon.slot_size = 10;
             beacon.frame_size = 100;
             // create packet
