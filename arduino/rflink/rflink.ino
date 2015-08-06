@@ -340,7 +340,7 @@ static int do_help(int argc, char *argv[])
 // Arduino standard initialisation function
 void setup(void)
 {
-    serial_init(57600L);
+    serial_init(115200L);
 
     // read node id from eeprom
     node_id = id_read();
