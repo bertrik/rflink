@@ -18,7 +18,6 @@ void serial_init(uint32_t speed);
 void serial_putc(char c);
 int serial_getc(void);
 bool serial_avail(void);
-void serial_write(char *s);
 
 // time functions
 int32_t time_millis(void);

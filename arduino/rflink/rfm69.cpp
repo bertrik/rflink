@@ -9,7 +9,7 @@
 #define RADIO_POWER_DBM     0
 
 // write data to a radio register
-static void radio_write(uint8_t reg, uint8_t * data, int len)
+static void radio_write(uint8_t reg, const uint8_t * data, int len)
 {
     spi_select(true);
     spi_transfer(reg);
@@ -75,7 +75,7 @@ bool radio_recv_packet(uint8_t * len_p, uint8_t * data, int size)
 }
 
 // directly sends a packet, blocks until packet sent
-void radio_send_packet(uint8_t len, uint8_t * data)
+void radio_send_packet(uint8_t len, const uint8_t * data)
 {
     // set mode to standby
     radio_write_reg(RFM69_OPMODE,

@@ -17,7 +17,7 @@ int radio_set_power(int dbm);
 uint32_t radio_set_frequency(uint32_t khz);
 
 // sends a packet over the air
-void radio_send_packet(uint8_t len, uint8_t *data);
+void radio_send_packet(uint8_t len, const uint8_t *data);
 
 // indicates if a packet was received
 bool radio_packet_avail(void);
